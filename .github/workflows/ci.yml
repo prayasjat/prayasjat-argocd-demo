@@ -1,0 +1,27 @@
+name: Kubernetes CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate YAML
+        run: |
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+
+          for file in Path("k8s").glob("*.yaml"):
+              with open(file) as f:
+                  yaml.safe_load_all(f)
+              print(f"{file} OK")
+          PY
