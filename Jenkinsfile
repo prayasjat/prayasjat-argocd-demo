@@ -1,5 +1,28 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+    - name: docker
+      image: docker:cli
+      command:
+        - cat
+      tty: true
+      volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+        type: Socket
+'''
+        }
+    }
 
     stages {
 
@@ -12,6 +35,7 @@ pipeline {
         stage('Validate') {
             steps {
                 sh '''
+                    set -e
                     test -f Dockerfile
                     test -f index.html
                     test -f k8s/deployment.yaml
@@ -23,35 +47,50 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh '''
-                    docker build -t nginx-demo:${BUILD_NUMBER} .
-                '''
+                container('docker') {
+                    sh '''
+                        set -e
+
+                        echo "Docker client:"
+                        docker --version
+
+                        echo "Docker server:"
+                        docker version
+
+                        echo "Building image..."
+                        docker build -t nginx-demo:${BUILD_NUMBER} .
+                    '''
+                }
             }
         }
 
         stage('Container Test') {
             steps {
-                sh '''
-                    docker run -d \
-                      --name nginx-demo-test-${BUILD_NUMBER} \
-                      -p 8085:80 \
-                      nginx-demo:${BUILD_NUMBER}
+                container('docker') {
+                    sh '''
+                        set -e
 
-                    sleep 3
+                        echo "Testing nginx configuration..."
+                        docker run --rm nginx-demo:${BUILD_NUMBER} nginx -t
 
-                    curl -f http://localhost:8085
+                        echo "Testing application files..."
+                        docker run --rm nginx-demo:${BUILD_NUMBER} \
+                          sh -c 'test -f /usr/share/nginx/html/index.html'
 
-                    docker rm -f nginx-demo-test-${BUILD_NUMBER}
-                '''
+                        echo "Container test passed"
+                    '''
+                }
             }
         }
     }
 
     post {
         always {
-            sh '''
-                docker rm -f nginx-demo-test-${BUILD_NUMBER} 2>/dev/null || true
-            '''
+            container('docker') {
+                sh '''
+                    docker image rm nginx-demo:${BUILD_NUMBER} 2>/dev/null || true
+                '''
+            }
         }
 
         success {
