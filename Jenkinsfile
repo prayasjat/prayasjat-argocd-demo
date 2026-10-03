@@ -141,33 +141,16 @@ stage('GitOps Update') {
             sh '''
                 set -e
 
-                echo "Updating Kubernetes image to ${IMAGE}"
-
                 sed -i -E "s#(^[[:space:]]*image: ).*#\\1${IMAGE}#" k8s/deployment.yaml
 
                 git config user.name "jenkins"
                 git config user.email "jenkins@localhost"
 
                 git add k8s/deployment.yaml
-                git commit -m "Update nginx image to ${IMAGE} [skip ci]"
+                git commit -m "Update nginx image to ${IMAGE}"
 
-                cat > git-askpass.sh <<'EOF'
-#!/bin/sh
-case "$1" in
-  *Username*) echo "$GIT_USER" ;;
-  *Password*) echo "$GIT_TOKEN" ;;
-esac
-EOF
-
-                chmod 700 git-askpass.sh
-
-                GIT_ASKPASS="$PWD/git-askpass.sh" \
-                GIT_TERMINAL_PROMPT=0 \
-                git push https://github.com/prayasjat/prayasjat-argocd-demo.git HEAD:main
-
-                rm -f git-askpass.sh
-
-                echo "GitOps update pushed successfully."
+                git remote set-url origin "https://${GIT_USER}:${GIT_TOKEN}@github.com/prayasjat/prayasjat-argocd-demo.git"
+                git push origin HEAD:main
             '''
         }
     }
