@@ -55,7 +55,7 @@ spec:
                     sh '''
                         set -e
                         echo "Building ${IMAGE}"
-                        docker build -t "${IMAGE}" .
+                        docker build --provenance=false --sbom=false -t "${IMAGE}" .
                     '''
                 }
             }
@@ -81,31 +81,34 @@ spec:
         }
 
         stage('Docker Push') {
-            steps {
-                container('docker') {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'dockerhub-creds',
-                            usernameVariable: 'DOCKER_USER',
-                            passwordVariable: 'DOCKER_PASS'
-                        )
-                    ]) {
-                        sh '''
-                            set -e
+    steps {
+        container('docker') {
+            withCredentials([
+                usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )
+            ]) {
+                sh '''
+                    set -e
 
-                            echo "$DOCKER_PASS" | docker login \
-                                -u "$DOCKER_USER" \
-                                --password-stdin
+                    echo "$DOCKER_PASS" | docker login \
+                        -u "$DOCKER_USER" \
+                        --password-stdin
 
-                            echo "Pushing ${IMAGE}..."
-                            docker push "${IMAGE}"
+                    echo "Pushing ${IMAGE}..."
 
-                            docker logout
-                        '''
-                    }
-                }
+                    timeout 10m docker push \
+                        --platform linux/amd64 \
+                        "${IMAGE}"
+
+                    docker logout
+                '''
             }
         }
+    }
+}
     }
 
     post {
