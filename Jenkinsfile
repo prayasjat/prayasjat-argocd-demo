@@ -24,6 +24,10 @@ spec:
         }
     }
 
+    environment {
+        IMAGE = "prayasjat/nginx-demo:${BUILD_NUMBER}"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -50,15 +54,8 @@ spec:
                 container('docker') {
                     sh '''
                         set -e
-
-                        echo "Docker client:"
-                        docker --version
-
-                        echo "Docker server:"
-                        docker version
-
-                        echo "Building image..."
-                        docker build -t nginx-demo:${BUILD_NUMBER} .
+                        echo "Building ${IMAGE}"
+                        docker build -t "${IMAGE}" .
                     '''
                 }
             }
@@ -71,14 +68,41 @@ spec:
                         set -e
 
                         echo "Testing nginx configuration..."
-                        docker run --rm nginx-demo:${BUILD_NUMBER} nginx -t
+                        docker run --rm "${IMAGE}" nginx -t
 
                         echo "Testing application files..."
-                        docker run --rm nginx-demo:${BUILD_NUMBER} \
+                        docker run --rm "${IMAGE}" \
                           sh -c 'test -f /usr/share/nginx/html/index.html'
 
                         echo "Container test passed"
                     '''
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                container('docker') {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'dockerhub-creds',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )
+                    ]) {
+                        sh '''
+                            set -e
+
+                            echo "$DOCKER_PASS" | docker login \
+                                -u "$DOCKER_USER" \
+                                --password-stdin
+
+                            echo "Pushing ${IMAGE}..."
+                            docker push "${IMAGE}"
+
+                            docker logout
+                        '''
+                    }
                 }
             }
         }
@@ -88,17 +112,17 @@ spec:
         always {
             container('docker') {
                 sh '''
-                    docker image rm nginx-demo:${BUILD_NUMBER} 2>/dev/null || true
+                    docker image rm "${IMAGE}" 2>/dev/null || true
                 '''
             }
         }
 
         success {
-            echo 'CI pipeline completed successfully.'
+            echo 'CI + Docker Registry pipeline completed successfully.'
         }
 
         failure {
-            echo 'CI pipeline failed.'
+            echo 'Pipeline failed.'
         }
     }
 }
