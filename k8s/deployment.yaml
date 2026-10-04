@@ -1,19 +1,90 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-demo
+  name: booking-api
+  namespace: argocd-demo
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: nginx-demo
+      app: booking-api
   template:
     metadata:
       labels:
-        app: nginx-demo
+        app: booking-api
     spec:
       containers:
-        - name: nginx
+        - name: booking-api
           image: prayasjat/nginx-demo:10
           ports:
-            - containerPort: 80
+            - containerPort: 8080
+          env:
+            - name: ROLE
+              value: "booking"
+            - name: PAYMENT_URL
+              value: "http://payment-api:8080"
+            - name: OTEL_SERVICE_NAME
+              value: "booking-api"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: argocd-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - name: payment-api
+          image: prayasjat/nginx-demo:10
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ROLE
+              value: "payment"
+            - name: OTEL_SERVICE_NAME
+              value: "payment-api"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
