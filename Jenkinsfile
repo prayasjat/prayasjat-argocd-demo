@@ -123,6 +123,27 @@ spec:
         }
 
         stage('GitOps Update') {
-            steps {
-                withCredentials([
-                    username
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'github-creds',
+                usernameVariable: 'GIT_USER',
+                passwordVariable: 'GIT_TOKEN'
+            )
+        ]) {
+            sh """
+                set -e
+
+                sed -i -E "s#(^[[:space:]]*image: ).*#\\1${IMAGE}#" k8s/deployment.yaml
+
+                git config user.name "jenkins"
+                git config user.email "jenkins@localhost"
+
+                git add k8s/deployment.yaml
+                git commit -m "Update nginx image to ${IMAGE}"
+
+                git push https://${GIT_USER}:${GIT_TOKEN}@github.com/prayasjat/prayasjat-argocd-demo.git HEAD:main
+            """
+        }
+    }
+}
