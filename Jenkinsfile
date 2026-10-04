@@ -41,12 +41,10 @@ spec:
             steps {
                 sh '''
                     set -e
-
                     test -f Dockerfile
                     test -f index.html
                     test -f k8s/deployment.yaml
                     test -f k8s/service.yaml
-
                     echo "Required files are present"
                 '''
             }
@@ -57,13 +55,11 @@ spec:
                 container('docker') {
                     sh '''
                         set -e
-
                         echo "Building ${IMAGE}"
-
                         docker build \
-                          --provenance=false \
-                          --sbom=false \
-                          -t "${IMAGE}" .
+                            --provenance=false \
+                            --sbom=false \
+                            -t "${IMAGE}" .
                     '''
                 }
             }
@@ -76,13 +72,11 @@ spec:
                         set -e
 
                         echo "Testing nginx configuration..."
-
                         docker run --rm "${IMAGE}" nginx -t
 
                         echo "Testing application files..."
-
                         docker run --rm "${IMAGE}" \
-                          sh -c 'test -f /usr/share/nginx/html/index.html'
+                            sh -c 'test -f /usr/share/nginx/html/index.html'
 
                         echo "Container test passed"
                     '''
@@ -123,27 +117,66 @@ spec:
         }
 
         stage('GitOps Update') {
-    steps {
-        withCredentials([
-            usernamePassword(
-                credentialsId: 'github-creds',
-                usernameVariable: 'GIT_USER',
-                passwordVariable: 'GIT_TOKEN'
-            )
-        ]) {
-            sh """
-                set -e
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github-creds',
+                        usernameVariable: 'GIT_USER',
+                        passwordVariable: 'GIT_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set -e
 
-                sed -i -E "s#(^[[:space:]]*image: ).*#\\1${IMAGE}#" k8s/deployment.yaml
+                        echo "Updating Kubernetes manifest..."
+                        echo "New image: ${IMAGE}"
 
-                git config user.name "jenkins"
-                git config user.email "jenkins@localhost"
+                        sed -i -E \
+                            "s#(^[[:space:]]*image: ).*#\\1${IMAGE}#" \
+                            k8s/deployment.yaml
 
-                git add k8s/deployment.yaml
-                git commit -m "Update nginx image to ${IMAGE}"
+                        echo "Updated image:"
+                        grep "image:" k8s/deployment.yaml
 
-                git push https://${GIT_USER}:${GIT_TOKEN}@github.com/prayasjat/prayasjat-argocd-demo.git HEAD:main
-            """
+                        git config user.name "jenkins"
+                        git config user.email "jenkins@localhost"
+
+                        git add k8s/deployment.yaml
+
+                        if git diff --cached --quiet; then
+                            echo "No manifest change detected."
+                            exit 0
+                        fi
+
+                        git commit -m "Update nginx image to ${IMAGE}"
+
+                        git push \
+                            "https://${GIT_USER}:${GIT_TOKEN}@github.com/prayasjat/prayasjat-argocd-demo.git" \
+                            HEAD:main
+
+                        echo "GitOps update completed successfully."
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+
+        always {
+            container('docker') {
+                sh '''
+                    docker image rm "${IMAGE}" 2>/dev/null || true
+                '''
+            }
+        }
+
+        success {
+            echo 'CI + Docker Registry + GitOps pipeline completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed.'
         }
     }
 }
