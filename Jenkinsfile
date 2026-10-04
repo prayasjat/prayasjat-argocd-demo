@@ -1,4 +1,3 @@
-```groovy
 pipeline {
 
     agent {
@@ -94,7 +93,6 @@ spec:
         stage('Docker Push') {
             steps {
                 container('docker') {
-
                     withCredentials([
                         usernamePassword(
                             credentialsId: 'dockerhub-creds',
@@ -102,7 +100,6 @@ spec:
                             passwordVariable: 'DOCKER_PASS'
                         )
                     ]) {
-
                         sh '''
                             set -e
 
@@ -127,70 +124,5 @@ spec:
 
         stage('GitOps Update') {
             steps {
-
                 withCredentials([
-                    usernamePassword(
-                        credentialsId: 'github-creds',
-                        usernameVariable: 'GIT_USER',
-                        passwordVariable: 'GIT_TOKEN'
-                    )
-                ]) {
-
-                    sh '''
-                        set -e
-
-                        echo "Updating Kubernetes manifest..."
-                        echo "New image: ${IMAGE}"
-
-                        sed -i -E \
-                          "s#(^[[:space:]]*image: ).*#\\1${IMAGE}#" \
-                          k8s/deployment.yaml
-
-                        echo "Updated deployment.yaml:"
-                        grep "image:" k8s/deployment.yaml
-
-                        git config user.name "jenkins"
-                        git config user.email "jenkins@localhost"
-
-                        git add k8s/deployment.yaml
-
-                        git diff --cached --quiet && {
-                            echo "No Kubernetes manifest change detected."
-                            exit 0
-                        }
-
-                        git commit \
-                          -m "Update nginx image to ${IMAGE}"
-
-                        git remote set-url origin \
-                          "https://${GIT_USER}:${GIT_TOKEN}@github.com/prayasjat/prayasjat-argocd-demo.git"
-
-                        git push origin HEAD:main
-
-                        echo "GitOps update completed successfully."
-                    '''
-                }
-            }
-        }
-    }
-
-    post {
-
-        always {
-            container('docker') {
-                sh '''
-                    docker image rm "${IMAGE}" 2>/dev/null || true
-                '''
-            }
-        }
-
-        success {
-            echo 'CI + Docker Registry + GitOps pipeline completed successfully.'
-        }
-
-        failure {
-            echo 'Pipeline failed.'
-        }
-    }
-}
-```
+                    username
