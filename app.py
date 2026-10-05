@@ -10,7 +10,11 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 from opentelemetry import trace
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
-
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
 ROLE = os.getenv("ROLE", "booking")
 PAYMENT_URL = os.getenv("PAYMENT_URL", "http://payment-api:8080")
@@ -20,6 +24,8 @@ app = Flask(__name__)
 
 FlaskInstrumentor().instrument_app(app)
 RequestsInstrumentor().instrument()
+
+
 
 tracer = trace.get_tracer("booking-platform")
 

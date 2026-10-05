@@ -25,8 +25,8 @@ spec:
               value: "http://payment-api:8080"
             - name: OTEL_SERVICE_NAME
               value: "booking-api"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://jaeger:4318"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://jaeger:4318/v1/traces"
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
               value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
@@ -70,8 +70,8 @@ spec:
               value: "payment"
             - name: OTEL_SERVICE_NAME
               value: "payment-api"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://jaeger:4318"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://jaeger:4318/v1/traces"
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
               value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
