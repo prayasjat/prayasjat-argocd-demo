@@ -1,3 +1,4 @@
+cat > Jenkinsfile <<'EOF'
 pipeline {
 
     agent {
@@ -41,10 +42,14 @@ spec:
             steps {
                 sh '''
                     set -e
+
                     test -f Dockerfile
-                    test -f index.html
+                    test -f app.py
+                    test -f requirements.txt
                     test -f k8s/deployment.yaml
                     test -f k8s/service.yaml
+                    test -f k8s/jaeger.yaml
+
                     echo "Required files are present"
                 '''
             }
@@ -55,11 +60,15 @@ spec:
                 container('docker') {
                     sh '''
                         set -e
+
                         echo "Building ${IMAGE}"
+
                         docker build \
                             --provenance=false \
                             --sbom=false \
                             -t "${IMAGE}" .
+
+                        echo "Docker build completed."
                     '''
                 }
             }
@@ -71,14 +80,30 @@ spec:
                     sh '''
                         set -e
 
-                        echo "Testing nginx configuration..."
-                        docker run --rm "${IMAGE}" nginx -t
+                        CONTAINER="booking-test-${BUILD_NUMBER}"
 
-                        echo "Testing application files..."
-                        docker run --rm "${IMAGE}" \
-                            sh -c 'test -f /usr/share/nginx/html/index.html'
+                        echo "Starting test container..."
 
-                        echo "Container test passed"
+                        docker run -d \
+                            --name "${CONTAINER}" \
+                            "${IMAGE}"
+
+                        trap 'docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true' EXIT
+
+                        echo "Waiting for application..."
+                        sleep 5
+
+                        echo "Testing /health..."
+
+                        docker exec "${CONTAINER}" \
+                            python -c "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8080/health'); print(r.read().decode())"
+
+                        echo "Testing /metrics..."
+
+                        docker exec "${CONTAINER}" \
+                            python -c "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8080/metrics'); print('metrics endpoint OK:', r.status)"
+
+                        echo "Container tests passed."
                     '''
                 }
             }
@@ -128,14 +153,13 @@ spec:
                     sh '''
                         set -e
 
-                        echo "Updating Kubernetes manifest..."
-                        echo "New image: ${IMAGE}"
+                        echo "Updating Kubernetes image to ${IMAGE}"
 
                         sed -i -E \
                             "s#(^[[:space:]]*image: ).*#\\1${IMAGE}#" \
                             k8s/deployment.yaml
 
-                        echo "Updated image:"
+                        echo "Images in deployment.yaml:"
                         grep "image:" k8s/deployment.yaml
 
                         git config user.name "jenkins"
@@ -148,7 +172,8 @@ spec:
                             exit 0
                         fi
 
-                        git commit -m "Update nginx image to ${IMAGE}"
+                        git commit \
+                            -m "Update application image to ${IMAGE}"
 
                         git push \
                             "https://${GIT_USER}:${GIT_TOKEN}@github.com/prayasjat/prayasjat-argocd-demo.git" \
@@ -172,7 +197,7 @@ spec:
         }
 
         success {
-            echo 'CI + Docker Registry + GitOps pipeline completed successfully.'
+            echo 'CI + Docker + GitOps pipeline completed successfully.'
         }
 
         failure {
@@ -180,3 +205,4 @@ spec:
         }
     }
 }
+EOF
