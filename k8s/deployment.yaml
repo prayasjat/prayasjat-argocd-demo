@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: booking-api
-          image: prayasjat/nginx-demo:10
+          image: prayasjat/nginx-demo:17
           ports:
             - containerPort: 8080
           env:
@@ -62,7 +62,7 @@ spec:
     spec:
       containers:
         - name: payment-api
-          image: prayasjat/nginx-demo:10
+          image: prayasjat/nginx-demo:17
           ports:
             - containerPort: 8080
           env:
